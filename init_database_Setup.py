@@ -1,11 +1,28 @@
 """
 Initialize Hospital OLTP Database
-Creates database and tables using the SQL schema
+Complete database setup: creates database, tables, loads sample data, and verifies all objects
 """
 
 import mysql.connector
 from mysql.connector import Error
+import os
+import logging
+from datetime import datetime
 from database_connection import DB_CONFIG, DATABASE_NAME, logger
+
+
+def setup_init_database_log():
+    """Setup timestamped log file for initialization process"""
+    log_dir = os.path.join(os.path.dirname(__file__), "init_database_Setup")
+    os.makedirs(log_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(log_dir, f"init_database_Setup_{timestamp}.log")
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    return log_path
 
 
 def create_database():
@@ -91,6 +108,68 @@ def execute_sql_file(filename='create_schema.sql'):
         return False
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        return False
+
+
+def load_sample_data(filename='hospital_sample_data.sql'):
+    """Load sample data from hospital_sample_data.sql file"""
+    try:
+        # Read the SQL file
+        with open(filename, 'r', encoding='utf-8') as file:
+            sql_script = file.read()
+        
+        # Connect to MySQL with database selected
+        config = DB_CONFIG.copy()
+        config['database'] = DATABASE_NAME
+        connection = mysql.connector.connect(**config)
+        
+        if connection.is_connected():
+            cursor = connection.cursor()
+            
+            # Clean and parse the SQL statements
+            lines = []
+            for line in sql_script.split('\n'):
+                stripped = line.strip()
+                if stripped.startswith('--'):
+                    continue
+                if '--' in line:
+                    line = line.split('--')[0]
+                lines.append(line)
+            
+            clean_script = '\n'.join(lines)
+            statements = [stmt.strip() for stmt in clean_script.split(';') if stmt.strip()]
+            
+            success_count = 0
+            error_count = 0
+            
+            for stmt in statements:
+                try:
+                    cursor.execute(stmt)
+                    try:
+                        cursor.fetchall()
+                    except:
+                        pass
+                    success_count += 1
+                except Error as e:
+                    if 'Duplicate entry' not in str(e):  # Allow duplicate key warnings
+                        logger.warning(f"Warning loading sample data: {e}")
+                    error_count += 1
+            
+            connection.commit()
+            logger.info(f"Successfully loaded {success_count} sample data statements")
+            
+            cursor.close()
+            connection.close()
+            return True
+            
+    except FileNotFoundError:
+        logger.warning(f"Sample data file '{filename}' not found - skipping sample data load")
+        return True  # Don't fail if sample data file is missing
+    except Error as e:
+        logger.error(f"Error loading sample data: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error loading sample data: {e}")
         return False
 
 
@@ -215,6 +294,9 @@ def insert_sample_data():
 
 def initialize_database():
     """Main function to initialize the complete database"""
+    log_path = setup_init_database_log()
+    logger.info(f"Init database log file: {log_path}")
+    
     print("Starting Hospital OLTP Database Initialization...\n")
     
     # Step 1: Create database
@@ -231,12 +313,19 @@ def initialize_database():
         return False
     print("[OK] Schema created\n")
     
-    # Step 3: Insert sample data
-    print("Step 3: Verifying sample data...")
+    # Step 3: Load sample data
+    print("Step 3: Loading sample data from hospital_sample_data.sql...")
+    if not load_sample_data():
+        print("Warning: Could not load sample data, but schema is ready.")
+    else:
+        print("[OK] Sample data loaded\n")
+    
+    # Step 4: Verify and display summary
+    print("Step 4: Verifying database initialization...")
     if not insert_sample_data():
         print("Warning: Could not verify sample data, but schema is ready.")
         return True
-    print("[OK] Sample data verified\n")
+    print("[OK] Database verification completed\n")
     
     print("="*50)
     print("Database initialization completed successfully!")

@@ -1,17 +1,17 @@
 # Hospital OLTP System - Database Schema Documentation
 
 ## Overview
-This database schema contains approximately **50 tables** organized into logical domains to support comprehensive hospital operations. The schema uses MySQL/MariaDB and implements comprehensive referential integrity through primary/foreign key relationships.
+This database schema contains **52 tables** organized into logical domains to support comprehensive hospital operations. The schema uses MySQL/MariaDB and implements comprehensive referential integrity through primary/foreign key relationships.
 
 ## Table Count Summary
-- **Total Tables**: 50
+- **Total Tables**: 52
 - **Reference Tables**: 2 (ICD Codes, CPT Codes)
 - **Organizational**: 6 (Departments, Facilities, Rooms, Beds, Equipment, Department Equipment)
 - **Patient Domain**: 4 (Patients, Addresses, Emergency Contacts, Allergies)
 - **Staff Domain**: 8 (Doctors, Nurses, Staff, Specialists, Schedules, Shifts, Assignments)
 - **Appointments**: 3 (Appointment Types, Appointments, Cancellations)
 - **Encounters**: 6 (Encounters, Vitals, Diagnoses, Procedures, Notes, Bed Assignments)
-- **Laboratory**: 4 (Lab Orders, Lab Tests, Lab Results, Radiology Orders, Radiology Results)
+- **Laboratory**: 5 (Lab Orders, Lab Tests, Lab Results, Radiology Orders, Radiology Results)
 - **Pharmacy**: 6 (Medications, Interactions, Prescriptions, Refills, Inventory, Orders)
 - **Insurance**: 7 (Companies, Plans, Policies, Authorizations, Claims, Claim Items, Invoices)
 - **Billing**: 3 (Invoices, Invoice Items, Payment Transactions)
@@ -532,14 +532,15 @@ facilities → rooms → beds → bed_assignments
 
 ## Quick Reference
 
-**Total Tables**: 50
+**Total Tables**: 52
 **Total Views**: 15+
 **Total Indexes**: 100+ (including foreign keys)
-**Relationships**: 80+ foreign key constraints
+**Relationships**: 82 foreign key constraints
 **Database Engine**: MySQL/MariaDB
 **Character Set**: UTF-8
 **Collation**: utf8mb4_general_ci
 
 ---
 
-*Last Updated: 2026-02-12*
+*Last Updated: February 2026*  
+*Status: Production-Ready (Prompt 24 - Markdown cleanup)*

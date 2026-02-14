@@ -1,331 +1,610 @@
-# Hospital OLTP System - Entity Relationship Diagram
+# Hospital OLTP System - Entity Relationship Diagrams
 
-This document provides visual representations of the database schema relationships.
+This document provides comprehensive visual representations of the database schema relationships across all domains.
 
-## High-Level Domain Overview
+## 1. High-Level System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    HOSPITAL OLTP SYSTEM                         │
-│                      ~50 Tables Total                           │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-        ┌──────────────────────┴──────────────────────┐
-        │                                             │
-    ┌───▼────┐                                   ┌────▼───┐
-    │PATIENTS│                                   │PROVIDERS│
-    │Domain  │                                   │ Domain │
-    └───┬────┘                                   └────┬───┘
-        │                                             │
-        ├─patients (4)                               ├─doctors (8)
-        ├─patient_addresses                          ├─nurses
-        ├─patient_emergency_contacts                 ├─staff
-        └─patient_allergies                          ├─specialists
-                                                     ├─doctor_schedules
-        ┌────────────────┐                          ├─staff_shifts
-        │                │                          ├─nurse_assignments
-    ┌───▼────┐      ┌────▼───┐                    └─ (relationships)
-    │CLINICAL│      │FACILITY│
-    │Domain  │      │ Domain │                    ┌────────────┐
-    └───┬────┘      └────┬───┘                    │ REFERENCE  │
-        │                │                        │   DATA     │
-        ├─encounters (6)  ├─facilities (6)        └────┬───────┘
-        ├─encounter_vitals                             │
-        ├─encounter_diagnoses                          ├─icd_codes (2)
-        ├─encounter_procedures                         └─cpt_codes
-        ├─clinical_notes
-        └─bed_assignments   ├─departments
-                           ├─facilities
-        ┌────────────────┐ ├─rooms
-        │                │ ├─beds
-    ┌───▼────┐      ┌────▼───┐ └─equipment
-    │ LAB &  │      │PHARMACY│
-    │RADIOLOGY│      │ Domain │                   ┌────────────┐
-    └───┬────┘      └────┬───┘                   │ INSURANCE  │
-        │                │                        │ & BILLING  │
-        ├─lab_orders (5)  ├─medications (6)       └────┬───────┘
-        ├─lab_tests       ├─drug_interactions           │
-        ├─lab_results     ├─prescriptions              ├─insurance_companies (7)
-        ├─radiology_orders├─prescription_refills       ├─insurance_plans
-        └─radiology_results                            ├─patient_insurance_policies
-                           ├─medication_inventory      ├─insurance_authorizations
-    ┌──────────────────┐ └─pharmacy_orders            ├─insurance_claims
-    │  APPOINTMENTS    │                              └─insurance_claim_items
-    │   & SCHEDULING   │
-    └────┬─────────────┘                             ┌────────────┐
-         │                                           │   BILLING  │
-         ├─appointment_types (3)                     └────┬───────┘
-         ├─appointments                                   │
-         └─appointment_cancellations                     ├─invoices (3)
-                                                         ├─invoice_items
-                                                         └─payment_transactions
-    ┌──────────────────┐
-    │     SYSTEM       │
-    │ ADMINISTRATION   │
-    └────┬─────────────┘
-         │
-         ├─users (4)
-         ├─roles
-         ├─user_roles
-         └─audit_logs
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    HOSPITAL OLTP SYSTEM - 52 TABLES                      │
+│                           (11 Domains)                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────┬───────────┬───┼───┬──────────┬────────────┐
+        │           │           │   │   │          │            │
+    ┌───▼──┐  ┌────▼───┐  ┌───▼──┐ │ ┌─▼───┐ ┌──▼────┐  ┌────▼──┐
+    │PATIENTS│  │PROVIDERS│  │ORG │ │ │LABS│ │PHARMACY│  │INSURANCE│
+    │(4)    │  │(7)     │  │(6) │ │ │(5) │ │(6)   │  │(7)     │
+    └───┬──┘  └────┬───┘  └───┬──┘ │ └─┬───┘ └──┬────┘  └────┬──┘
+        │          │          │    │   │        │            │
+        │      ┌────┴──┐      │    │   │    ┌───┴─┐       ┌──┴────┐
+        │      │       │      │    │   │    │     │       │       │
+    ┌───▼──────▼──┐ ┌──▼─────▼──┐ ├───┼────┤  ┌──▼───┐  ┌─▼──┐
+    │APPOINTMENTS │ │ ENCOUNTERS │ │   │    │  │BILLING│  │SYS │
+    │(3)          │ │(6)         │ │   │    │  │(3)    │  │(4) │
+    └──────────────┘ └────────────┘ │   │    │  └───────┘  └─────┘
+                                     │   │    │
+                          REFERENCE DATA
+                             (2)
 ```
 
-## Core Relationships Map
+## 2. Reference Data Domain
 
-### Patient-Centric Flow
 ```
-                         ┌─────────────┐
-                         │  PATIENTS   │
-                         │  (Core)     │
-                         └──────┬──────┘
-                                │
-                ┌───────────────┼───────────────┐
-                │               │               │
-        ┌───────▼───────┐  ┌───▼─────┐  ┌──────▼────────┐
-        │patient_       │  │patient_ │  │patient_       │
-        │addresses      │  │emergency│  │allergies      │
-        └───────────────┘  │_contacts│  └───────────────┘
-                           └─────────┘
-                                │
-                ┌───────────────┼───────────────┐
-                │               │               │
-        ┌───────▼────┐   ┌──────▼────┐   ┌─────▼──────┐
-        │appointments│   │patient_   │   │insurance   │
-        │            │   │insurance_ │   │_claims     │
-        └─────┬──────┘   │policies   │   └─────┬──────┘
-              │          └─────┬─────┘         │
-              │                │               │
-        ┌─────▼──────┐   ┌─────▼──────┐  ┌────▼───────┐
-        │encounters  │   │insurance_  │  │claim_items │
-        │            │   │claims      │  └────────────┘
-        └─────┬──────┘   └────────────┘
+┌──────────────────────────────────────┐
+│         REFERENCE DATA (2)           │
+├──────────────────────────────────────┤
+│ • icd_codes (54+ diagnosis codes)    │
+│ • cpt_codes (40+ procedure codes)    │
+└──────────────────────────────────────┘
+         ▲              ▲
+         │              │
+    Referenced by:
+    • encounter_diagnoses (icd_code_id)
+    • encounter_procedures (cpt_code_id)
+    • insurance_claim_items (icd/cpt)
+```
+
+## 3. Organizational Structure Domain
+
+```
+        ┌─────────────────────────────────────────────┐
+        │     ORGANIZATIONAL STRUCTURE (6)             │
+        └─────────────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+   ┌────▼─────┐    ┌─────▼────┐    ┌────▼────┐
+   │departments│    │facilities │    │equipment│
+   │(12)      │    │(4)        │    │(12)     │
+   └────┬─────┘    └─────┬────┘    └────────┘
+        │                │
+        │ 1:N            │ 1:N
+        │                │
+   ┌────▼──────────┐     │
+   │   rooms       │     │
+   │   (31)        │     │
+   └────┬──────────┘     │
+        │ 1:N            │
+        │                │
+   ┌────▼──────────┐     │
+   │    beds       │     │
+   │   (33)        │     │
+   └───────────────┘     │
+                         │
+                    ┌────▼──────────────┐
+                    │department_equipment│
+                    │(12)               │
+                    └───────────────────┘
+                    
+Relationships:
+- facilities 1 ──────────────> N rooms
+- rooms 1 ──────────────> N beds
+- departments 1 ──────────────> N doctors
+- departments 1 ──────────────> N nurses
+- departments 1 ──────────────> N staff
+- departments N ──────────────> M equipment
+```
+
+## 4. Patient Domain
+
+```
+┌─────────────────────────────────────┐
+│      PATIENT MANAGEMENT (4)         │
+└─────────────────────────────────────┘
               │
-    ┌─────────┼─────────┐
-    │         │         │
-┌───▼───┐ ┌──▼───┐ ┌───▼────┐
-│vitals │ │diag- │ │proce-  │
-│       │ │noses │ │dures   │
-└───────┘ └──────┘ └────────┘
+         ┌────▼─────┐
+         │ patients │
+         │  (15)    │
+         └────┬─────┘
+              │ 1
               │
-    ┌─────────┼─────────┐
-    │         │         │
-┌───▼──────┐ ┌▼────┐ ┌─▼──────┐
-│lab_orders│ │Rx   │ │invoices│
-└────┬─────┘ └┬────┘ └───┬────┘
-     │        │           │
-┌────▼────┐ ┌▼──────┐ ┌──▼─────┐
-│lab_tests│ │refills│ │invoice │
-└────┬────┘ └───────┘ │_items  │
-     │                └───┬────┘
-┌────▼───────┐           │
-│lab_results │      ┌────▼────────┐
-└────────────┘      │payment_     │
-                    │transactions │
-                    └─────────────┘
+        ┌─────┼──────────┬─────────────┐
+        │ N   │ N        │ N           │ N
+        │     │          │             │
+   ┌────▼──┐ ┌─▼─────┐ ┌▼──────────────┐ ┌▼──────────────┐
+   │patient_│ │patient_│ │patient_       │ │patient_       │
+   │addresses│ │emergency│emergency_     │ │allergies      │
+   │(67)    │ │contacts │contacts       │ │(26)           │
+   │        │ │(75)     │(75)           │ │               │
+   └────────┘ └────────┘ └───────────────┘ └───────────────┘
+
+Relationships:
+- patients 1 ──────────────> N patient_addresses
+- patients 1 ──────────────> N patient_emergency_contacts
+- patients 1 ──────────────> N patient_allergies
 ```
 
-### Provider Management Flow
+## 5. Healthcare Providers Domain
+
 ```
-┌──────────────┐
-│ DEPARTMENTS  │
-└──────┬───────┘
-       │
-   ┌───┴───────────┬──────────────┐
-   │               │              │
-┌──▼──────┐   ┌────▼───┐    ┌────▼────┐
-│ DOCTORS │   │ NURSES │    │  STAFF  │
-└────┬────┘   └────┬───┘    └────┬────┘
-     │             │              │
-     ├─specialists │              │
-     ├─schedules   ├─assignments  ├─shifts
-     │             │              │
-     └─────────────┴──────────────┘
-                   │
-            ┌──────┴──────┐
-            │             │
-     ┌──────▼────┐  ┌─────▼────┐
-     │appointments│ │encounters│
-     └────────────┘ └──────────┘
+┌─────────────────────────────────────┐
+│    HEALTHCARE PROVIDERS (7)         │
+└─────────────────────────────────────┘
+              │
+        ┌─────┼──────────┐
+        │     │          │
+   ┌────▼──┐ ┌▼─────┐ ┌─▼────┐
+   │doctors │ │nurses │ │staff │
+   │(15)   │ │(13)  │ │(8)   │
+   └────┬──┘ └──┬───┘ └──┬───┘
+        │       │        │
+        │ N     │ N      │ N
+        │       │        │
+   ┌────▼───────┴────────┴────┐
+   │   staff_shifts           │
+   │   (126)                  │
+   └──────────────────────────┘
+        │
+   ┌────▼─────────────┐
+   │specialists       │
+   │(8)               │
+   └──────────────────┘
+   
+   ┌────────────────────┐
+   │doctor_schedules    │
+   │(91)                │
+   │                    │
+   │ 1 doctor ──> N schedules
+   └────────────────────┘
+   
+   ┌──────────────────────────────┐
+   │nurse_assignments             │
+   │(13)                           │
+   │                              │
+   │ N nurses ──> N patients     │
+   │ N nurses ──> N beds         │
+   └──────────────────────────────┘
+
+Relationships:
+- departments N ──────────────> M doctors
+- departments N ──────────────> M nurses
+- departments N ──────────────> M staff
+- doctors 1 ──────────────> N specialists
+- doctors 1 ──────────────> N doctor_schedules
+- nurses N ──────────────> M patients (assignments)
+- nurses N ──────────────> M beds (assignments)
+- staff/nurses 1 ──────────────> N staff_shifts
 ```
 
-### Facility & Bed Management
+## 6. Appointments & Scheduling Domain
+
 ```
-┌───────────┐
-│FACILITIES │
-└─────┬─────┘
-      │
-  ┌───▼────┐
-  │ ROOMS  │──────┐
-  └───┬────┘      │
+┌──────────────────────────────────┐
+│ APPOINTMENTS & SCHEDULING (3)    │
+└──────────────────────────────────┘
+            │
+      ┌─────▼──────┐
+      │appointment_ │
+      │types        │
+      │(5)          │
+      └─────┬──────┘
+            │ 1:N
+            │
+      ┌─────▼──────────────┐
+      │appointments        │
+      │(5)                 │
+      └─────┬──────────────┘
+            │ 1:N
+            │
+      ┌─────▼─────────────────┐
+      │appointment_           │
+      │cancellations          │
+      │(tracking)             │
+      └───────────────────────┘
+
+Relationships:
+- appointment_types 1 ──────────────> N appointments
+- appointments 1 ──────────────> N appointment_cancellations
+- patients N ──────────────> M appointments
+- doctors N ──────────────> M appointments
+- rooms N ──────────────> M appointments
+```
+
+## 7. Clinical Encounters Domain
+
+```
+┌─────────────────────────────────────┐
+│   CLINICAL ENCOUNTERS (6)           │
+└─────────────────────────────────────┘
+            │
+        ┌───▼──────┐
+        │encounters│
+        │(~5)      │
+        └───┬──────┘
+            │ 1
+            │
+        ┌───┼──────────────────┬──────────┐
+        │ N │ N                │ N        │ N
+        │   │                  │          │
+  ┌─────▼──┐ ┌──────────────┐ ┌▼────────┐ ┌▼──────────────┐
+  │encounter_│ │encounter_    │ │encounter_│ │clinical_      │
+  │vitals   │ │diagnoses     │ │procedures│ │notes          │
+  │(~5)     │ │(~5)          │ │(~5)     │ │(~5)           │
+  └─────────┘ └──────────────┘ └─────────┘ └───────────────┘
+        │ N
+        │
+  ┌─────▼────────────┐
+  │bed_assignments   │
+  │(~5)              │
+  └──────────────────┘
+
+Relationships:
+- patients 1 ──────────────> N encounters
+- doctors N ──────────────> M encounters
+- appointments N ──────────────> M encounters
+- rooms N ──────────────> M encounters
+- beds N ──────────────> M encounters
+- encounters 1 ──────────────> N encounter_vitals
+- encounters 1 ──────────────> N encounter_diagnoses
+- encounters 1 ──────────────> N encounter_procedures
+- encounters 1 ──────────────> N clinical_notes
+- encounters 1 ──────────────> N bed_assignments
+- icd_codes N ──────────────> M encounter_diagnoses
+- cpt_codes N ──────────────> M encounter_procedures
+```
+
+## 8. Laboratory Services Domain
+
+```
+┌─────────────────────────────────────┐
+│   LABORATORY SERVICES (5)           │
+└─────────────────────────────────────┘
+            │
+        ┌───▼──────┐
+        │lab_orders│
+        │(~5)      │
+        └───┬──────┘
+            │ 1
+            │
+        ┌───▼────────┐
+        │lab_tests   │
+        │(~10)       │
+        └───┬────────┘
+            │ 1
+            │
+        ┌───▼──────────┐
+        │lab_results   │
+        │(~10)         │
+        └───────────────┘
+
+Relationships:
+- patients 1 ──────────────> N lab_orders
+- doctors N ──────────────> M lab_orders (ordering)
+- encounters N ──────────────> M lab_orders
+- lab_orders 1 ──────────────> N lab_tests
+- lab_tests 1 ──────────────> N lab_results
+```
+
+## 9. Radiology Services Domain
+
+```
+┌─────────────────────────────────────┐
+│   RADIOLOGY SERVICES (Integrated)   │
+└─────────────────────────────────────┘
+            │
+        ┌───▼──────────┐
+        │radiology_    │
+        │orders        │
+        │(~5)          │
+        └───┬──────────┘
+            │ 1
+            │
+        ┌───▼──────────┐
+        │radiology_    │
+        │results       │
+        │(~5)          │
+        └───────────────┘
+
+Relationships:
+- patients 1 ──────────────> N radiology_orders
+- doctors N ──────────────> M radiology_orders (ordering)
+- encounters N ──────────────> M radiology_orders
+- radiology_orders 1 ──────────────> N radiology_results
+- doctors N ──────────────> M radiology_results (reading)
+```
+
+## 10. Pharmacy & Medications Domain
+
+```
+┌──────────────────────────────────────────┐
+│   PHARMACY & MEDICATIONS (6)             │
+└──────────────────────────────────────────┘
+            │
+      ┌─────┴─────┐
       │           │
-  ┌───▼───┐   ┌───▼────────┐
-  │ BEDS  │   │appointments│
-  └───┬───┘   └────────────┘
+  ┌───▼────────┐  ┌──▼────────────┐
+  │medications │  │drug_           │
+  │(40+)       │  │interactions    │
+  │            │  │(20)            │
+  └───┬────────┘  └────────────────┘
       │
-  ┌───▼───────────┐
-  │bed_assignments│
-  └───────────────┘
-```
-
-### Diagnostic Workflow
-```
-┌───────────┐
-│ENCOUNTERS │
-└─────┬─────┘
+      │ 1:N
       │
- ┌────┴────────┐
- │             │
-┌▼──────────┐ ┌▼────────────┐
-│LAB_ORDERS │ │RADIOLOGY_   │
-│           │ │ORDERS       │
-└─────┬─────┘ └──────┬──────┘
-      │              │
-┌─────▼──────┐  ┌────▼─────────┐
-│ LAB_TESTS  │  │RADIOLOGY_    │
-└─────┬──────┘  │RESULTS       │
-      │         └──────────────┘
-┌─────▼──────┐
-│LAB_RESULTS │
-└────────────┘
+  ┌───▼──────────┐
+  │prescriptions │
+  │(~5)          │
+  └───┬──────────┘
+      │ 1:N
+      │
+  ┌───▼──────────────┐
+  │prescription_     │
+  │refills          │
+  │(tracking)       │
+  └──────────────────┘
+      
+  ┌────────────────────┐
+  │medication_         │
+  │inventory           │
+  │(~5)                │
+  │                    │
+  │ 1 medication ──> N inventory records
+  └────────────────────┘
+  
+  ┌────────────────────┐
+  │pharmacy_orders     │
+  │(replenishment)     │
+  │                    │
+  │ 1 medication ──> N orders
+  └────────────────────┘
+
+Relationships:
+- medications N ──────────────> M drug_interactions
+- patients 1 ──────────────> N prescriptions
+- doctors N ──────────────> M prescriptions
+- encounters N ──────────────> M prescriptions
+- medications N ──────────────> M prescriptions
+- prescriptions 1 ──────────────> N prescription_refills
+- medications 1 ──────────────> N medication_inventory
+- medications 1 ──────────────> N pharmacy_orders
 ```
 
-### Medication Management
+## 11. Insurance & Claims Domain
+
 ```
-┌──────────────┐
-│ MEDICATIONS  │
-└──────┬───────┘
+┌────────────────────────────────────────────┐
+│   INSURANCE & CLAIMS (7)                   │
+└────────────────────────────────────────────┘
+            │
+      ┌─────▼──────────┐
+      │insurance_      │
+      │companies       │
+      │(10)            │
+      └─────┬──────────┘
+            │ 1:N
+            │
+      ┌─────▼────────┐
+      │insurance_    │
+      │plans         │
+      │(4)           │
+      └─────┬────────┘
+            │ 1:N
+      ┌─────▼──────────────────┐
+      │patient_insurance_      │
+      │policies                │
+      │(3)                     │
+      └─────┬──────────────────┘
+            │ 1:N
+      ┌─────▼─────────────┐
+      │insurance_         │
+      │authorizations     │
+      │(pre-auth)         │
+      └───────────────────┘
+      
+      Also:
+      ┌────────────────────────┐
+      │insurance_claims        │
+      │(claim submissions)     │
+      └────┬───────────────────┘
+           │ 1:N
+      ┌────▼────────────────┐
+      │insurance_claim_     │
+      │items                │
+      │(line items)         │
+      └─────────────────────┘
+
+Relationships:
+- insurance_companies 1 ──────────────> N insurance_plans
+- insurance_plans 1 ──────────────> N patient_insurance_policies
+- patients 1 ──────────────> N patient_insurance_policies
+- patient_insurance_policies 1 ──────────────> N insurance_authorizations
+- patients 1 ──────────────> N insurance_claims
+- patient_insurance_policies N ──────────────> M insurance_claims
+- encounters N ──────────────> M insurance_claims
+- insurance_claims 1 ──────────────> N insurance_claim_items
+- cpt_codes N ──────────────> M insurance_claim_items
+- icd_codes N ──────────────> M insurance_claim_items
+```
+
+## 12. Billing & Payments Domain
+
+```
+┌────────────────────────────────────┐
+│   BILLING & PAYMENTS (3)           │
+└────────────────────────────────────┘
+            │
+        ┌───▼────────┐
+        │invoices    │
+        │(~5)        │
+        └───┬────────┘
+            │ 1:N
+            │
+      ┌─────▼──────────┐
+      │invoice_items   │
+      │(~10)           │
+      └─────┬──────────┘
+            │
+            │ Also:
+            │
+        ┌───▼────────────────┐
+        │payment_            │
+        │transactions        │
+        │(~5)                │
+        └────────────────────┘
+
+Relationships:
+- patients 1 ──────────────> N invoices
+- encounters N ──────────────> M invoices
+- invoices 1 ──────────────> N invoice_items
+- cpt_codes N ──────────────> M invoice_items
+- invoices 1 ──────────────> N payment_transactions
+- patients N ──────────────> M payment_transactions
+```
+
+## 13. System Administration Domain
+
+```
+┌───────────────────────────────────────┐
+│   SYSTEM ADMINISTRATION (4)           │
+└───────────────────────────────────────┘
+            │
+      ┌─────┴──────────┬─────────────┐
+      │                │             │
+  ┌───▼───┐        ┌───▼────┐   ┌───▼──────────┐
+  │users  │        │roles   │   │audit_logs    │
+  │(~10) │        │(~5)    │   │(comprehensive)
+  └───┬───┘        └───┬────┘   └──────────────┘
+      │                │
+      │ N              │ N
+      │                │
+      └────────┬───────┘
+               │
+         ┌─────▼──────────┐
+         │user_roles      │
+         │(role mapping)  │
+         └─────────────────┘
+
+Relationships:
+- users N ──────────────> M roles
+- users 1 ──────────────> N audit_logs (tracking changes)
+- All tables 1 ──────────────> N audit_logs
+```
+
+## 14. Complete Patient Data Flow
+
+```
+Patient Registration
        │
-  ┌────┴──────────┬────────────┐
-  │               │            │
-┌─▼────────────┐ ┌▼──────────┐ ┌▼────────────┐
-│drug_         │ │medication_│ │prescriptions│
-│interactions  │ │inventory  │ └──────┬──────┘
-└──────────────┘ └─────┬─────┘        │
-                       │         ┌────▼────────┐
-                  ┌────▼──────┐  │prescription_│
-                  │pharmacy_  │  │refills      │
-                  │orders     │  └─────────────┘
-                  └───────────┘
-```
-
-### Insurance & Claims Processing
-```
-┌──────────────────┐
-│INSURANCE_        │
-│COMPANIES         │
-└────────┬─────────┘
-         │
-    ┌────▼────────┐
-    │INSURANCE_   │
-    │PLANS        │
-    └────┬────────┘
-         │
-    ┌────▼───────────────┐
-    │PATIENT_INSURANCE_  │
-    │POLICIES            │
-    └────┬───────────────┘
-         │
-    ┌────┴─────────┬──────────────┐
-    │              │              │
-┌───▼──────────┐ ┌▼────────────┐ ┌▼──────────┐
-│INSURANCE_    │ │INSURANCE_   │ │INSURANCE_ │
-│AUTHORIZATIONS│ │CLAIMS       │ │CLAIMS     │
-└──────────────┘ └──────┬──────┘ └───────────┘
-                        │
-                  ┌─────▼────────┐
-                  │CLAIM_ITEMS   │
-                  └──────────────┘
-```
-
-### Billing & Payments
-```
-┌────────────┐
-│ ENCOUNTERS │
-└──────┬─────┘
+       ▼
+    patients ──────────────────────┐
+       │                           │
+       ├─> patient_addresses       │
+       ├─> patient_emergency_contacts
+       ├─> patient_allergies       │
+       └─> patient_insurance_policies
+                                   │
+       ┌───────────────────────────┘
        │
-  ┌────▼────────┐
-  │  INVOICES   │
-  └──────┬──────┘
-         │
-    ┌────┴──────┬────────────────┐
-    │           │                │
-┌───▼────────┐ ┌▼──────────┐ ┌──▼─────────────┐
-│INVOICE_    │ │INSURANCE_  │ │PAYMENT_        │
-│ITEMS       │ │CLAIMS      │ │TRANSACTIONS    │
-└────────────┘ └────────────┘ └────────────────┘
+       ▼
+  appointments ◄─────── appointment_types
+       │
+       ├──> appointment_cancellations
+       │
+       ▼
+   encounters ◄──────── encounters.appointment_id
+       │
+       ├─> encounter_vitals
+       ├─> encounter_diagnoses ◄─── icd_codes
+       ├─> encounter_procedures ◄─── cpt_codes
+       ├─> clinical_notes
+       ├─> bed_assignments
+       │
+       ├─> lab_orders ─> lab_tests ─> lab_results
+       ├─> radiology_orders ─> radiology_results
+       ├─> prescriptions ─> prescription_refills ◄─── medications
+       │
+       ├─> insurance_claims ─> insurance_claim_items
+       │
+       └─> invoices ─> invoice_items ─> payment_transactions
 ```
 
-## Key Cardinality Relationships
+## 15. Complete Provider Data Flow
+
+```
+departments
+    │
+    ├─> doctors ◄─── doctor_schedules
+    │       │
+    │       ├─> specialists
+    │       ├─> appointments
+    │       ├─> encounters
+    │       ├─> lab_orders
+    │       ├─> radiology_orders
+    │       └─> prescriptions
+    │
+    ├─> nurses ◄─── nurse_assignments
+    │       │        (patient assignments)
+    │       └─> staff_shifts
+    │
+    └─> staff ◄─── staff_shifts
+            └─> department_equipment
+```
+
+## 16. Key Cardinality Rules
 
 ### One-to-Many (1:N)
-- **patients** → patient_addresses (1 patient : many addresses)
-- **patients** → appointments (1 patient : many appointments)
-- **doctors** → appointments (1 doctor : many appointments)
-- **departments** → doctors (1 department : many doctors)
-- **encounters** → encounter_vitals (1 encounter : many vital readings)
-- **medications** → prescriptions (1 medication : many prescriptions)
+- `facilities 1:N rooms`
+- `rooms 1:N beds`
+- `departments 1:N doctors`
+- `departments 1:N nurses`
+- `departments 1:N staff`
+- `patients 1:N addresses`
+- `patients 1:N encounters`
+- `patients 1:N appointments`
+- `appointments 1:N cancellations`
+- `encounters 1:N vitals`
+- `encounters 1:N diagnoses`
+- `prescriptions 1:N refills`
+- `invoices 1:N items`
+- `lab_orders 1:N tests`
+- `insurance_companies 1:N plans`
 
-### Many-to-Many (M:N) via Junction Tables
-- **medications** ↔ **medications** via drug_interactions
-- **users** ↔ **roles** via user_roles
-- **departments** ↔ **equipment** via department_equipment
+### Many-to-Many (N:M)
+- `departments N:M equipment` (via department_equipment)
+- `nurses N:M patients` (via nurse_assignments)
+- `medications N:M drug_interactions`
+- `doctors N:M prescriptions`
+- `appointments N:M clinicians`
 
-### Self-Referencing
-- **appointments** → parent_appointment_id (follow-up appointments)
-- **prescriptions** → original_prescription_id (refill tracking)
+## 17. Referential Integrity Summary
 
-## Foreign Key Cascade Behaviors
+**Total Foreign Key Constraints: 82**
 
-### ON DELETE CASCADE
-Used for dependent data that should be removed with parent:
-- patient_addresses when patient deleted
-- appointments when patient/doctor deleted
-- encounter_vitals when encounter deleted
-- lab_tests when lab_order deleted
+- **Reference Domain:** 0 (standalone)
+- **Organizational Domain:** 6
+- **Patient Domain:** 4
+- **Provider Domain:** 12
+- **Appointments Domain:** 6
+- **Clinical Domain:** 18
+- **Laboratory Domain:** 6
+- **Pharmacy Domain:** 10
+- **Insurance Domain:** 12
+- **Billing Domain:** 6
+- **System Admin Domain:** 4
 
-### ON DELETE SET NULL
-Used for optional references:
-- doctor.department_id (doctor can exist without department assignment)
-- appointment.room_id (appointment can exist without room)
-- encounter.appointment_id (encounter may not be from appointment)
+## 18. Index Strategy
 
-### ON DELETE RESTRICT
-Used for reference data that must not be deleted if referenced:
-- icd_codes (cannot delete if used in diagnoses)
-- cpt_codes (cannot delete if used in procedures)
-- medications (cannot delete if prescribed)
+**All Foreign Keys Indexed** (82 indexes)  
+**Primary Keys** (52 indexes)  
+**Business Key Indexes:**
+- patients.mrn
+- patients.ssn
+- doctors.npi_number
+- doctors.license_number
+- medications.ndc_code
+- appointments.appointment_number
+- encounters.encounter_number
 
-## Database Normalization
-
-### Normal Forms Achieved
-- **1NF**: All tables have atomic values, no repeating groups
-- **2NF**: All non-key attributes fully dependent on primary key
-- **3NF**: No transitive dependencies
-- **BCNF**: Most tables in Boyce-Codd Normal Form
-
-### Denormalization for Performance
-- Computed columns: amount_due in invoices, age calculation
-- Summary views for reporting
-- Redundant foreign keys for direct access (e.g., prescriptions has both encounter_id and patient_id)
-
-## Indexing Strategy Summary
-
-### Primary Indexes
-- All tables have PRIMARY KEY with AUTO_INCREMENT
-- Natural keys have UNIQUE constraints
-
-### Secondary Indexes
-- All foreign keys indexed
-- Frequently searched fields (mrn, npi_number, dates)
-- Status fields for filtering
-- Composite indexes on name fields
-
-### Full-Text Indexes (Optional Enhancement)
-- clinical_notes.note_text
-- encounter_diagnoses.diagnosis_description
-- radiology_results.findings
+**Composite Indexes:**
+- (patient_id, encounter_id)
+- (doctor_id, appointment_date)
+- (facility_id, room_number)
 
 ---
 
-*For detailed table definitions, see SCHEMA_DOCUMENTATION.md*
-*For SQL implementation, see create_schema.sql*
+**Last Updated:** February 2026  
+**Total Domains:** 11  
+**Total Tables:** 52  
+**Total FK Relationships:** 82  
+**Total Views:** 15  
+**Status:** Production-Ready (Prompt 25)
