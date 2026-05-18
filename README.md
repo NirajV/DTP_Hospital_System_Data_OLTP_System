@@ -264,3 +264,5 @@ mysql -u root -p hospital_OLTP_system -e "SELECT * FROM vw_active_doctors;"
 **Python:** 3.8+  
 **MySQL:** 8.0+  
 **Version:** 1.0 (Prompt 24 - Complete)
+# Hospital_Management_Application
+# Hospital_Management_Application
