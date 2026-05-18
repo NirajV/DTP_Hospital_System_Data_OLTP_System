@@ -5,14 +5,23 @@ import Link from "next/link";
 import { Search, Filter, Download, UserPlus, ChevronRight } from "lucide-react";
 import { listPatients } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
+import { NewPatientModal } from "@/components/new-patient-modal";
 import { initials, avatarColor, cn } from "@/lib/utils";
 import type { Patient } from "@/lib/types";
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filter, setFilter] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => { listPatients().then(setPatients); }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const rows = useMemo(() => {
     const f = filter.trim().toLowerCase();
@@ -38,7 +47,10 @@ export default function PatientsPage() {
           <button className="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
             <Download className="w-4 h-4" /> Export
           </button>
-          <button className="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2"
+          >
             <UserPlus className="w-4 h-4" /> New patient
           </button>
         </div>
@@ -118,6 +130,21 @@ export default function PatientsPage() {
           </div>
         </div>
       </div>
+
+      <NewPatientModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={(p) => {
+          setPatients((prev) => [p, ...prev]);
+          setToast(`✓ Patient ${p.first} ${p.last} created · MRN ${p.mrn}`);
+        }}
+      />
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg bg-slate-900 text-white text-sm ring-soft">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

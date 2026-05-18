@@ -15,6 +15,7 @@ from flask import Flask, jsonify
 from api.measurements_api import measurements_bp
 from api.exports_api import exports_bp
 from api.search_api import search_bp
+from api.patients_api import patients_bp
 
 
 def create_app() -> Flask:
@@ -22,6 +23,7 @@ def create_app() -> Flask:
     app.register_blueprint(measurements_bp)
     app.register_blueprint(exports_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(patients_bp)
 
     @app.get("/healthz")
     def healthz():
