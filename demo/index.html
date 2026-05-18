@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MediFlow · Hospital OLTP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { font-family: 'Inter', system-ui, sans-serif; background:#f8fafc; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  [data-view] { display: none; }
+  [data-view].active { display: block; }
+  .ring-soft { box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.04); }
+  .nav-item.active { background:#eff6ff; color:#1d4ed8; }
+  .nav-item.active svg { color:#1d4ed8; }
+  .tab.active { color:#1d4ed8; border-color:#1d4ed8; }
+  .pulse-dot::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981; margin-right:6px; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 900:'#1e3a8a' }
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="text-slate-800">
+
+<!-- ============================================================
+     LOGIN SCREEN
+============================================================ -->
+<div id="login" class="min-h-screen grid place-items-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
+  <div class="w-full max-w-md p-8 bg-white rounded-2xl ring-soft">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-xl bg-brand-600 grid place-items-center text-white font-bold">M</div>
+      <div>
+        <div class="font-semibold text-slate-900">MediFlow</div>
+        <div class="text-xs text-slate-500">Hospital Operations Suite</div>
+      </div>
+    </div>
+    <h1 class="text-2xl font-semibold text-slate-900">Welcome back</h1>
+    <p class="text-sm text-slate-500 mb-6">Sign in to your provider account</p>
+    <form onsubmit="event.preventDefault(); enterApp();" class="space-y-4">
+      <div>
+        <label class="text-xs font-medium text-slate-600">Email</label>
+        <input value="dr.smith@mediflow.health" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600">Password</label>
+        <input type="password" value="demo-password" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm" />
+      </div>
+      <div class="flex items-center justify-between text-xs text-slate-500">
+        <label class="flex items-center gap-2"><input type="checkbox" class="rounded" checked /> Remember me</label>
+        <a href="#" class="text-brand-600 hover:underline">Forgot password?</a>
+      </div>
+      <button type="submit" class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium transition">Sign in</button>
+    </form>
+    <div class="mt-6 text-xs text-slate-400 text-center">HIPAA-compliant · Audit-logged · v0.9 demo</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     APP SHELL
+============================================================ -->
+<div id="app" class="hidden min-h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+    <div class="h-16 px-5 flex items-center gap-3 border-b border-slate-200">
+      <div class="w-9 h-9 rounded-lg bg-brand-600 grid place-items-center text-white font-bold">M</div>
+      <div>
+        <div class="font-semibold text-slate-900 leading-tight">MediFlow</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-400">Riverside General</div>
+      </div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1 text-sm">
+      <a href="#" data-nav="dashboard" class="nav-item active flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </a>
+      <a href="#" data-nav="patients" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="users" class="w-4 h-4"></i> Patients
+      </a>
+      <a href="#" data-nav="appointments" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="calendar" class="w-4 h-4"></i> Appointments
+      </a>
+      <a href="#" data-nav="encounters" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="stethoscope" class="w-4 h-4"></i> Encounters
+      </a>
+      <a href="#" data-nav="labs" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="flask-conical" class="w-4 h-4"></i> Lab Orders
+      </a>
+      <a href="#" data-nav="pharmacy" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="pill" class="w-4 h-4"></i> Pharmacy
+      </a>
+      <a href="#" data-nav="billing" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="receipt" class="w-4 h-4"></i> Billing
+      </a>
+      <a href="#" data-nav="reports" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Reports
+      </a>
+      <div class="pt-3 mt-3 border-t border-slate-100">
+        <a href="#" data-nav="audit" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+          <i data-lucide="shield-check" class="w-4 h-4"></i> Audit Trail
+        </a>
+        <a href="#" data-nav="settings" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
+          <i data-lucide="settings" class="w-4 h-4"></i> Settings
+        </a>
+      </div>
+    </nav>
+    <div class="p-3 border-t border-slate-200">
+      <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+        <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center text-sm font-semibold">JS</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-slate-900 truncate">Dr. Julia Smith</div>
+          <div class="text-[11px] text-slate-500 truncate pulse-dot">Cardiology · On shift</div>
+        </div>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- TOP BAR -->
+    <header class="h-16 bg-white border-b border-slate-200 flex items-center px-6 gap-4">
+      <div class="flex-1 max-w-xl relative">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input id="globalSearch" placeholder="Search patients by MRN, name, or DOB…" class="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-transparent focus:bg-white focus:border-slate-200 focus:ring-2 focus:ring-brand-100 outline-none text-sm" />
+        <div id="searchResults" class="hidden absolute z-30 mt-1 w-full bg-white rounded-lg ring-soft border border-slate-100 max-h-72 overflow-auto scroll-thin"></div>
+      </div>
+      <button class="relative p-2 rounded-lg hover:bg-slate-100">
+        <i data-lucide="bell" class="w-5 h-5 text-slate-600"></i>
+        <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500"></span>
+      </button>
+      <button class="p-2 rounded-lg hover:bg-slate-100">
+        <i data-lucide="help-circle" class="w-5 h-5 text-slate-600"></i>
+      </button>
+      <div class="h-8 w-px bg-slate-200"></div>
+      <button onclick="logout()" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Sign out
+      </button>
+    </header>
+
+    <!-- PAGE CONTAINER -->
+    <main class="flex-1 overflow-y-auto scroll-thin">
+
+      <!-- =========== DASHBOARD =========== -->
+      <section data-view="dashboard" class="active p-6 space-y-6">
+        <div class="flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Good afternoon, Dr. Smith</h1>
+            <p class="text-sm text-slate-500">Sunday, May 17, 2026 · 8 patients on your panel today</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i> Export day
+            </button>
+            <button onclick="navTo('encounters')" class="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> New encounter
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI cards -->
+        <div class="grid grid-cols-4 gap-4">
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Today's encounters</span>
+              <span class="text-emerald-600 text-xs font-medium">+12%</span>
+            </div>
+            <div class="mt-2 flex items-end gap-2">
+              <div class="text-3xl font-semibold text-slate-900">24</div>
+              <div class="text-xs text-slate-500 mb-1">vs 21 yesterday</div>
+            </div>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Vitals recorded</span>
+              <span class="text-emerald-600 text-xs font-medium">+5%</span>
+            </div>
+            <div class="mt-2 flex items-end gap-2">
+              <div class="text-3xl font-semibold text-slate-900">187</div>
+              <div class="text-xs text-slate-500 mb-1">measurements</div>
+            </div>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Abnormal results</span>
+              <span class="text-rose-600 text-xs font-medium">9 alerts</span>
+            </div>
+            <div class="mt-2 flex items-end gap-2">
+              <div class="text-3xl font-semibold text-slate-900">9</div>
+              <div class="text-xs text-slate-500 mb-1">need review</div>
+            </div>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Avg encounter time</span>
+              <span class="text-slate-400 text-xs font-medium">last 7d</span>
+            </div>
+            <div class="mt-2 flex items-end gap-2">
+              <div class="text-3xl font-semibold text-slate-900">22<span class="text-base text-slate-400">min</span></div>
+              <div class="text-xs text-slate-500 mb-1">target ≤ 25</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="col-span-2 p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <div class="font-semibold text-slate-900">Encounters this week</div>
+                <div class="text-xs text-slate-500">Outpatient · Inpatient · Emergency</div>
+              </div>
+              <select class="text-xs border border-slate-200 rounded-md px-2 py-1">
+                <option>Last 7 days</option>
+                <option>Last 30 days</option>
+              </select>
+            </div>
+            <canvas id="encChart" height="120"></canvas>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="font-semibold text-slate-900 mb-1">Bed occupancy</div>
+            <div class="text-xs text-slate-500 mb-4">By department</div>
+            <canvas id="bedChart" height="120"></canvas>
+          </div>
+        </div>
+
+        <!-- Today + Alerts -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="col-span-2 p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-semibold text-slate-900">Today's schedule</div>
+              <a href="#" onclick="navTo('appointments')" class="text-xs text-brand-600 hover:underline">View all</a>
+            </div>
+            <div class="space-y-2" id="todaySchedule"></div>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="font-semibold text-slate-900 mb-4">Critical alerts</div>
+            <div class="space-y-3" id="alertsPanel"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== PATIENTS =========== -->
+      <section data-view="patients" class="p-6 space-y-6">
+        <div class="flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Patients</h1>
+            <p class="text-sm text-slate-500">All active patients in your facility</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+              <i data-lucide="filter" class="w-4 h-4"></i> Filters
+            </button>
+            <button class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i> Export
+            </button>
+            <button class="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> New patient
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl ring-soft border border-slate-100 overflow-hidden">
+          <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div class="flex-1 relative">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input id="patientFilter" placeholder="Filter patients…" class="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-transparent focus:bg-white focus:border-slate-200 outline-none text-sm" />
+            </div>
+            <select class="text-xs border border-slate-200 rounded-md px-2 py-1.5">
+              <option>All status</option><option>Active</option><option>Inactive</option>
+            </select>
+            <select class="text-xs border border-slate-200 rounded-md px-2 py-1.5">
+              <option>All departments</option><option>Cardiology</option><option>Oncology</option>
+            </select>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="text-left px-5 py-3">Patient</th>
+                <th class="text-left px-5 py-3">MRN</th>
+                <th class="text-left px-5 py-3">DOB / Age</th>
+                <th class="text-left px-5 py-3">Last visit</th>
+                <th class="text-left px-5 py-3">Primary doctor</th>
+                <th class="text-left px-5 py-3">Status</th>
+                <th class="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="patientRows" class="divide-y divide-slate-100"></tbody>
+          </table>
+          <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div>Showing 1 – 8 of 524 patients</div>
+            <div class="flex items-center gap-1">
+              <button class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">←</button>
+              <button class="px-2 py-1 rounded border border-brand-600 bg-brand-50 text-brand-700">1</button>
+              <button class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">2</button>
+              <button class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">3</button>
+              <button class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">→</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== PATIENT DETAIL =========== -->
+      <section data-view="patient-detail" class="p-6 space-y-6">
+        <!-- breadcrumb -->
+        <div class="flex items-center text-sm text-slate-500 gap-2">
+          <a href="#" onclick="navTo('patients')" class="hover:text-brand-600">Patients</a>
+          <i data-lucide="chevron-right" class="w-3 h-3"></i>
+          <span class="text-slate-900 font-medium" id="pdName">…</span>
+        </div>
+
+        <!-- patient header card -->
+        <div class="p-6 bg-white rounded-xl ring-soft border border-slate-100">
+          <div class="flex items-start justify-between gap-6">
+            <div class="flex items-center gap-4">
+              <div id="pdAvatar" class="w-14 h-14 rounded-full grid place-items-center text-lg font-semibold"></div>
+              <div>
+                <div class="flex items-center gap-3">
+                  <h2 class="text-xl font-semibold text-slate-900" id="pdHeaderName">…</h2>
+                  <span id="pdStatus" class="text-[11px] px-2 py-0.5 rounded-full"></span>
+                  <span id="pdAlert" class="hidden text-[11px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-medium"></span>
+                </div>
+                <div class="text-sm text-slate-500 mt-1" id="pdMeta">…</div>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+                <i data-lucide="calendar-plus" class="w-4 h-4"></i> Schedule
+              </button>
+              <button onclick="openVitalsModal()" class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4"></i> Record vitals
+              </button>
+              <button class="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+                <i data-lucide="file-plus" class="w-4 h-4"></i> New encounter
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-6 grid grid-cols-4 gap-4 text-sm">
+            <div><div class="text-xs text-slate-500">Blood group</div><div class="font-medium" id="pdBlood">—</div></div>
+            <div><div class="text-xs text-slate-500">Phone</div><div class="font-medium" id="pdPhone">—</div></div>
+            <div><div class="text-xs text-slate-500">Insurance</div><div class="font-medium" id="pdIns">—</div></div>
+            <div><div class="text-xs text-slate-500">Primary care</div><div class="font-medium" id="pdPcp">—</div></div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-xl ring-soft border border-slate-100">
+          <div class="border-b border-slate-100 flex px-4">
+            <button class="tab active px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="overview">Overview</button>
+            <button class="tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="vitals">Vitals &amp; Labs</button>
+            <button class="tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="encounters">Encounters</button>
+            <button class="tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="meds">Medications</button>
+            <button class="tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="allergies">Allergies</button>
+            <button class="tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="docs">Documents</button>
+          </div>
+
+          <!-- Overview -->
+          <div data-tab-pane="overview" class="p-6 grid grid-cols-3 gap-6">
+            <div class="col-span-2 space-y-5">
+              <div>
+                <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Current encounter</div>
+                <div class="p-4 rounded-lg border border-slate-200" id="currentEnc"></div>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Recent vitals (last 24h)</div>
+                <canvas id="vitalsChart" height="100"></canvas>
+              </div>
+            </div>
+            <div class="space-y-5">
+              <div>
+                <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Active diagnoses</div>
+                <ul class="space-y-2 text-sm" id="pdDiagnoses"></ul>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Allergies</div>
+                <ul class="space-y-1 text-sm" id="pdAllergies"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vitals tab -->
+          <div data-tab-pane="vitals" class="hidden p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium text-slate-900">Clinical measurements</div>
+                <div class="text-xs text-slate-500">Unified (type · unit · value) per Appendix C.1</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+                </button>
+                <button onclick="openVitalsModal()" class="px-3 py-1.5 text-xs rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i> Record
+                </button>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th class="text-left px-4 py-2">Type</th>
+                    <th class="text-left px-4 py-2">Value</th>
+                    <th class="text-left px-4 py-2">Unit</th>
+                    <th class="text-left px-4 py-2">Recorded by</th>
+                    <th class="text-left px-4 py-2">Recorded at</th>
+                    <th class="text-left px-4 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="vitalsRows" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Other tabs (stubs) -->
+          <div data-tab-pane="encounters" class="hidden p-6 text-sm text-slate-500">Encounter history list (stubbed for demo).</div>
+          <div data-tab-pane="meds" class="hidden p-6 text-sm text-slate-500">Active &amp; past prescriptions (stubbed for demo).</div>
+          <div data-tab-pane="allergies" class="hidden p-6 text-sm text-slate-500">Allergy registry view (stubbed for demo).</div>
+          <div data-tab-pane="docs" class="hidden p-6 text-sm text-slate-500">Uploaded documents (stubbed for demo).</div>
+        </div>
+      </section>
+
+      <!-- =========== APPOINTMENTS =========== -->
+      <section data-view="appointments" class="p-6 space-y-6">
+        <div class="flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Appointments</h1>
+            <p class="text-sm text-slate-500">Week of May 17 – 23, 2026</p>
+          </div>
+          <div class="flex gap-2">
+            <div class="flex border border-slate-200 rounded-lg overflow-hidden text-sm">
+              <button class="px-3 py-1.5 bg-slate-100">Day</button>
+              <button class="px-3 py-1.5 bg-white text-brand-700 font-medium">Week</button>
+              <button class="px-3 py-1.5 bg-white">Month</button>
+            </div>
+            <button class="px-3 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2">
+              <i data-lucide="calendar-plus" class="w-4 h-4"></i> New appointment
+            </button>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl ring-soft border border-slate-100 overflow-hidden">
+          <div class="grid grid-cols-8 text-xs font-medium text-slate-500 border-b border-slate-100">
+            <div class="p-3">Time</div>
+            <div class="p-3 text-center">Sun 17</div>
+            <div class="p-3 text-center bg-brand-50 text-brand-700">Mon 18 · Today</div>
+            <div class="p-3 text-center">Tue 19</div>
+            <div class="p-3 text-center">Wed 20</div>
+            <div class="p-3 text-center">Thu 21</div>
+            <div class="p-3 text-center">Fri 22</div>
+            <div class="p-3 text-center">Sat 23</div>
+          </div>
+          <div id="calendarGrid"></div>
+        </div>
+      </section>
+
+      <!-- =========== ENCOUNTERS =========== -->
+      <section data-view="encounters" class="p-6 space-y-6">
+        <h1 class="text-2xl font-semibold text-slate-900">Encounters</h1>
+        <p class="text-sm text-slate-500">Active and recent encounters across the facility</p>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="p-4 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="text-xs uppercase text-slate-500 tracking-wider mb-2">In progress</div>
+            <div id="encInProgress" class="space-y-2"></div>
+          </div>
+          <div class="p-4 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="text-xs uppercase text-slate-500 tracking-wider mb-2">Completed today</div>
+            <div id="encCompleted" class="space-y-2"></div>
+          </div>
+          <div class="p-4 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="text-xs uppercase text-slate-500 tracking-wider mb-2">Scheduled</div>
+            <div id="encScheduled" class="space-y-2"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== REPORTS =========== -->
+      <section data-view="reports" class="p-6 space-y-6">
+        <div class="flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Reports &amp; Export</h1>
+            <p class="text-sm text-slate-500">Per Appendix C.3 — exports audited; PHI restricted by role</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="activity" class="w-5 h-5 text-brand-600"></i><div class="font-medium">Patient vitals export</div></div>
+            <p class="text-xs text-slate-500 mb-3">CSV / Excel · 90-day window · all measurement types</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Generate</button>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="users" class="w-5 h-5 text-emerald-600"></i><div class="font-medium">Daily census</div></div>
+            <p class="text-xs text-slate-500 mb-3">PDF · admissions, discharges, bed occupancy</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Generate</button>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="stethoscope" class="w-5 h-5 text-violet-600"></i><div class="font-medium">Doctor performance</div></div>
+            <p class="text-xs text-slate-500 mb-3">Excel · 90-day · encounters, avg time, outcomes</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Generate</button>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="receipt" class="w-5 h-5 text-amber-600"></i><div class="font-medium">A/R aging</div></div>
+            <p class="text-xs text-slate-500 mb-3">Excel · outstanding invoices by bucket</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Generate</button>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="shield-alert" class="w-5 h-5 text-rose-600"></i><div class="font-medium">Credential expiry</div></div>
+            <p class="text-xs text-slate-500 mb-3">CSV · clinicians with licenses expiring ≤ 60 days</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Generate</button>
+          </div>
+          <div class="p-5 bg-white rounded-xl ring-soft border border-slate-100">
+            <div class="flex items-center gap-3 mb-2"><i data-lucide="file-text" class="w-5 h-5 text-slate-600"></i><div class="font-medium">Custom query</div></div>
+            <p class="text-xs text-slate-500 mb-3">Build your own report using saved views</p>
+            <button class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> New report</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stubs for the remaining nav items -->
+      <section data-view="labs" class="p-6">
+        <h1 class="text-2xl font-semibold text-slate-900 mb-2">Lab Orders</h1>
+        <p class="text-sm text-slate-500">Lab order queue, results review, and turnaround metrics. (Stubbed for demo.)</p>
+      </section>
+      <section data-view="pharmacy" class="p-6">
+        <h1 class="text-2xl font-semibold text-slate-900 mb-2">Pharmacy</h1>
+        <p class="text-sm text-slate-500">Medication catalog, inventory, prescriptions. (Stubbed for demo.)</p>
+      </section>
+      <section data-view="billing" class="p-6">
+        <h1 class="text-2xl font-semibold text-slate-900 mb-2">Billing</h1>
+        <p class="text-sm text-slate-500">Invoices, payments, insurance claims. (Stubbed for demo.)</p>
+      </section>
+      <section data-view="audit" class="p-6">
+        <h1 class="text-2xl font-semibold text-slate-900 mb-2">Audit Trail</h1>
+        <p class="text-sm text-slate-500">Immutable log of all clinical writes and data exports. (Stubbed for demo.)</p>
+      </section>
+      <section data-view="settings" class="p-6">
+        <h1 class="text-2xl font-semibold text-slate-900 mb-2">Settings</h1>
+        <p class="text-sm text-slate-500">Roles, departments, facility config. (Stubbed for demo.)</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============================================================
+     RECORD VITALS MODAL  (Appendix C.1 capture form)
+============================================================ -->
+<div id="vitalsModal" class="hidden fixed inset-0 z-40 bg-slate-900/40 grid place-items-center p-4">
+  <div class="w-full max-w-3xl bg-white rounded-2xl ring-soft overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div>
+        <div class="font-semibold text-slate-900">Record clinical measurements</div>
+        <div class="text-xs text-slate-500" id="vmPatient">…</div>
+      </div>
+      <button onclick="closeVitalsModal()" class="p-1 rounded hover:bg-slate-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <form onsubmit="event.preventDefault(); saveVitals();" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-slate-500 px-1">
+        <div class="col-span-5">Measurement type</div>
+        <div class="col-span-3">Value</div>
+        <div class="col-span-3">Unit</div>
+        <div class="col-span-1"></div>
+      </div>
+      <div id="vmRows" class="space-y-2"></div>
+      <button type="button" onclick="addVitalRow()" class="text-xs text-brand-600 hover:underline flex items-center gap-1">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add another measurement
+      </button>
+      <div>
+        <label class="text-xs font-medium text-slate-600">Notes (optional)</label>
+        <textarea rows="2" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm"></textarea>
+      </div>
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+        <div class="text-xs text-slate-500 flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Audit-logged · timestamped automatically
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="closeVitalsModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700">Save measurements</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================
+     TOAST
+============================================================ -->
+<div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg bg-slate-900 text-white text-sm ring-soft"></div>
+
+<!-- ============================================================
+     APP LOGIC
+============================================================ -->
+<script>
+/* -------- mock data -------- */
+const MEASUREMENT_TYPES = [
+  { code:'bp_systolic',       name:'Blood Pressure (Systolic)',  unit:'mmHg',   low:90,  high:130 },
+  { code:'bp_diastolic',      name:'Blood Pressure (Diastolic)', unit:'mmHg',   low:60,  high:85 },
+  { code:'heart_rate',        name:'Heart Rate',                  unit:'bpm',    low:60,  high:100 },
+  { code:'respiratory_rate',  name:'Respiratory Rate',            unit:'rpm',    low:12,  high:20 },
+  { code:'temperature_f',     name:'Body Temperature',            unit:'°F',     low:97.0,high:99.5 },
+  { code:'oxygen_saturation', name:'Oxygen Saturation (SpO₂)',    unit:'%',      low:95,  high:100 },
+  { code:'weight_lb',         name:'Body Weight',                 unit:'lb',     low:null,high:null },
+  { code:'height_in',         name:'Body Height',                 unit:'in',     low:null,high:null },
+  { code:'pain_score',        name:'Pain Score',                  unit:'0–10',   low:0,   high:3 },
+  { code:'hemoglobin',        name:'Hemoglobin',                  unit:'g/dL',   low:12.0,high:17.5 },
+  { code:'glucose',           name:'Glucose (fasting)',           unit:'mg/dL',  low:70,  high:99 },
+  { code:'wbc',               name:'White Blood Cell Count',       unit:'K/µL',   low:4.5, high:11.0 },
+];
+
+const PATIENTS = [
+  { id:1, mrn:'MRN-1024', first:'Sarah', last:'Chen',     dob:'1990-03-15', age:34, sex:'F', blood:'O+',  phone:'(415) 555-0102', ins:'Aetna PPO',     pcp:'Dr. Julia Smith',    status:'active',   alert:'Hemoglobin 7.5 g/dL (low)' },
+  { id:2, mrn:'MRN-1098', first:'Marcus', last:'Johnson', dob:'1978-11-02', age:46, sex:'M', blood:'A-',  phone:'(415) 555-0145', ins:'Blue Shield',   pcp:'Dr. Julia Smith',    status:'active' },
+  { id:3, mrn:'MRN-1141', first:'Aisha',  last:'Patel',   dob:'1985-07-21', age:38, sex:'F', blood:'B+',  phone:'(415) 555-0167', ins:'United Health', pcp:'Dr. Robert Kim',     status:'active' },
+  { id:4, mrn:'MRN-1156', first:'Diego',  last:'Ramirez', dob:'1962-01-30', age:63, sex:'M', blood:'O-',  phone:'(415) 555-0181', ins:'Medicare',      pcp:'Dr. Julia Smith',    status:'active',   alert:'BP 162/98 (high)' },
+  { id:5, mrn:'MRN-1203', first:'Emily',  last:'O’Brien', dob:'2001-09-12', age:23, sex:'F', blood:'AB+', phone:'(415) 555-0194', ins:'Kaiser',        pcp:'Dr. Hannah Lee',     status:'active' },
+  { id:6, mrn:'MRN-1278', first:'Yuki',   last:'Tanaka',  dob:'1955-04-08', age:70, sex:'F', blood:'A+',  phone:'(415) 555-0212', ins:'Medicare',      pcp:'Dr. Robert Kim',     status:'active' },
+  { id:7, mrn:'MRN-1311', first:'Liam',   last:'Walsh',   dob:'1994-12-19', age:30, sex:'M', blood:'O+',  phone:'(415) 555-0228', ins:'Aetna PPO',     pcp:'Dr. Julia Smith',    status:'active' },
+  { id:8, mrn:'MRN-1349', first:'Nadia',  last:'Hassan',  dob:'1971-06-04', age:53, sex:'F', blood:'B-',  phone:'(415) 555-0241', ins:'Cigna',         pcp:'Dr. Hannah Lee',     status:'inactive' },
+];
+
+const ENCOUNTERS_BY_PATIENT = {
+  1: { num:'ENC-7821', date:'2026-05-17 13:45', type:'outpatient', status:'in_progress', doctor:'Dr. Julia Smith', complaint:'Fatigue, shortness of breath on exertion' },
+  4: { num:'ENC-7805', date:'2026-05-17 11:10', type:'consultation', status:'in_progress', doctor:'Dr. Julia Smith', complaint:'Routine hypertension follow-up' },
+};
+
+const VITALS = {
+  1: [
+    { type:'Blood Pressure (Systolic)',  value:120, unit:'mmHg', by:'Nurse Park', at:'14:22', status:'Normal' },
+    { type:'Blood Pressure (Diastolic)', value:80,  unit:'mmHg', by:'Nurse Park', at:'14:22', status:'Normal' },
+    { type:'Heart Rate',                 value:78,  unit:'bpm',  by:'Nurse Park', at:'14:22', status:'Normal' },
+    { type:'Temperature',                value:98.6,unit:'°F',   by:'Nurse Park', at:'14:22', status:'Normal' },
+    { type:'Oxygen Saturation',          value:98,  unit:'%',    by:'Nurse Park', at:'14:22', status:'Normal' },
+    { type:'Hemoglobin',                 value:7.5, unit:'g/dL', by:'Lab Tech',   at:'09:10', status:'Low' },
+    { type:'White Blood Cell Count',     value:8.2, unit:'K/µL', by:'Lab Tech',   at:'09:10', status:'Normal' },
+    { type:'Glucose (fasting)',          value:94,  unit:'mg/dL',by:'Lab Tech',   at:'09:10', status:'Normal' },
+  ],
+  4: [
+    { type:'Blood Pressure (Systolic)',  value:162, unit:'mmHg', by:'Nurse Diaz', at:'11:08', status:'High' },
+    { type:'Blood Pressure (Diastolic)', value:98,  unit:'mmHg', by:'Nurse Diaz', at:'11:08', status:'High' },
+    { type:'Heart Rate',                 value:84,  unit:'bpm',  by:'Nurse Diaz', at:'11:08', status:'Normal' },
+    { type:'Temperature',                value:98.2,unit:'°F',   by:'Nurse Diaz', at:'11:08', status:'Normal' },
+  ],
+};
+
+const DIAGNOSES = {
+  1: [
+    { code:'D50.9',  text:'Iron deficiency anaemia',  severity:'moderate' },
+    { code:'R53.83', text:'Other fatigue',            severity:'mild' },
+  ],
+  4: [
+    { code:'I10',    text:'Essential hypertension',    severity:'moderate' },
+    { code:'E78.5',  text:'Hyperlipidaemia',           severity:'mild' },
+  ],
+};
+
+const ALLERGIES = {
+  1: ['Penicillin (rash)', 'Sulfa drugs (hives)'],
+  4: ['NSAIDs (GI upset)'],
+};
+
+const TODAY = [
+  { time:'09:00', patient:'Marcus Johnson',  reason:'Cardiology follow-up',  room:'Rm 301', status:'completed' },
+  { time:'10:00', patient:'Aisha Patel',     reason:'Annual physical',       room:'Rm 302', status:'completed' },
+  { time:'11:00', patient:'Diego Ramirez',   reason:'BP check',              room:'Rm 301', status:'in_progress' },
+  { time:'13:30', patient:'Sarah Chen',      reason:'Anaemia workup',        room:'Rm 305', status:'in_progress' },
+  { time:'14:30', patient:'Liam Walsh',      reason:'Knee pain',             room:'Rm 304', status:'scheduled' },
+  { time:'15:00', patient:'Emily O’Brien', reason:'Vaccination',         room:'Rm 302', status:'scheduled' },
+];
+
+const ALERTS = [
+  { sev:'high',  text:'Sarah Chen — Hemoglobin 7.5 g/dL (low)' },
+  { sev:'high',  text:'Diego Ramirez — BP 162/98 (stage 2 HTN)' },
+  { sev:'med',   text:'Lab: 3 results pending review (>4h)' },
+  { sev:'low',   text:'Credential: Dr. Kim license expires in 22d' },
+];
+
+/* -------- nav -------- */
+function navTo(view) {
+  document.querySelectorAll('[data-view]').forEach(v => v.classList.toggle('active', v.dataset.view === view));
+  document.querySelectorAll('[data-nav]').forEach(n => n.classList.toggle('active', n.dataset.nav === view));
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'patients') renderPatients();
+  if (view === 'appointments') renderCalendar();
+  if (view === 'encounters') renderEncountersBoard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('[data-nav]').forEach(n => n.addEventListener('click', e => { e.preventDefault(); navTo(n.dataset.nav); }));
+
+/* -------- auth -------- */
+function enterApp() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  setTimeout(() => { lucide.createIcons(); bootstrap(); }, 50);
+}
+function logout() {
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+}
+
+/* -------- dashboard -------- */
+let encChartObj, bedChartObj, vitalsChartObj;
+function renderDashboard() {
+  // schedule
+  document.getElementById('todaySchedule').innerHTML = TODAY.map(t => `
+    <div class="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 cursor-pointer" onclick="openPatientByName('${t.patient}')">
+      <div class="w-12 text-xs font-medium text-slate-500">${t.time}</div>
+      <div class="flex-1">
+        <div class="text-sm font-medium text-slate-900">${t.patient}</div>
+        <div class="text-xs text-slate-500">${t.reason} · ${t.room}</div>
+      </div>
+      ${statusBadge(t.status)}
+    </div>`).join('');
+
+  // alerts
+  document.getElementById('alertsPanel').innerHTML = ALERTS.map(a => {
+    const palette = a.sev==='high'? 'bg-rose-50 text-rose-700 border-rose-100' : a.sev==='med'? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-slate-50 text-slate-700 border-slate-100';
+    const ico = a.sev==='high'? 'alert-circle' : a.sev==='med'? 'alert-triangle' : 'info';
+    return `<div class="flex items-start gap-2 p-2 rounded-lg border ${palette}">
+      <i data-lucide="${ico}" class="w-4 h-4 mt-0.5 shrink-0"></i>
+      <div class="text-xs">${a.text}</div>
+    </div>`;
+  }).join('');
+  lucide.createIcons();
+
+  // charts
+  if (encChartObj) encChartObj.destroy();
+  encChartObj = new Chart(document.getElementById('encChart'), {
+    type:'bar',
+    data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[
+        { label:'Outpatient', data:[14,16,12,18,20,8,10], backgroundColor:'#3b82f6', borderRadius:6 },
+        { label:'Inpatient',  data:[6,5,7,6,8,3,4],       backgroundColor:'#10b981', borderRadius:6 },
+        { label:'Emergency',  data:[3,4,2,5,3,5,4],       backgroundColor:'#f59e0b', borderRadius:6 },
+      ]
+    },
+    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}}, x:{grid:{display:false}}} }
+  });
+  if (bedChartObj) bedChartObj.destroy();
+  bedChartObj = new Chart(document.getElementById('bedChart'), {
+    type:'doughnut',
+    data:{
+      labels:['ICU','Surgery','Cardio','Pediatrics','Oncology'],
+      datasets:[{ data:[18,12,22,9,14], backgroundColor:['#2563eb','#10b981','#f59e0b','#8b5cf6','#ef4444'], borderWidth:0 }]
+    },
+    options:{ cutout:'65%', plugins:{legend:{position:'bottom', labels:{boxWidth:8, font:{size:10}}}} }
+  });
+}
+
+function statusBadge(s) {
+  const map = {
+    completed:   ['bg-emerald-50 text-emerald-700','Completed'],
+    in_progress: ['bg-blue-50 text-blue-700','In progress'],
+    scheduled:   ['bg-slate-100 text-slate-600','Scheduled'],
+    cancelled:   ['bg-rose-50 text-rose-700','Cancelled'],
+    active:      ['bg-emerald-50 text-emerald-700','Active'],
+    inactive:    ['bg-slate-100 text-slate-500','Inactive'],
+    Normal:      ['bg-emerald-50 text-emerald-700','Normal'],
+    High:        ['bg-rose-50 text-rose-700','High'],
+    Low:         ['bg-amber-50 text-amber-700','Low'],
+  };
+  const [cls, lbl] = map[s] || ['bg-slate-100 text-slate-600', s];
+  return `<span class="text-[11px] px-2 py-0.5 rounded-full ${cls} font-medium">${lbl}</span>`;
+}
+
+/* -------- patients -------- */
+function renderPatients(filter='') {
+  const f = filter.trim().toLowerCase();
+  const rows = PATIENTS.filter(p =>
+    !f || p.first.toLowerCase().includes(f) || p.last.toLowerCase().includes(f) || p.mrn.toLowerCase().includes(f)
+  ).map(p => `
+    <tr class="hover:bg-slate-50 cursor-pointer" onclick="openPatient(${p.id})">
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full ${avatarColor(p.id)} grid place-items-center text-xs font-semibold">${initials(p)}</div>
+          <div>
+            <div class="font-medium text-slate-900">${p.last}, ${p.first}</div>
+            <div class="text-xs text-slate-500">${p.sex} · ${p.age}y</div>
+          </div>
+        </div>
+      </td>
+      <td class="px-5 py-3 font-mono text-xs">${p.mrn}</td>
+      <td class="px-5 py-3 text-sm">${p.dob}</td>
+      <td class="px-5 py-3 text-sm">${p.id===1||p.id===4? 'Today':'2 weeks ago'}</td>
+      <td class="px-5 py-3 text-sm">${p.pcp}</td>
+      <td class="px-5 py-3">${statusBadge(p.status)}</td>
+      <td class="px-5 py-3 text-right"><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 inline"></i></td>
+    </tr>`).join('');
+  document.getElementById('patientRows').innerHTML = rows;
+  lucide.createIcons();
+}
+function initials(p){ return (p.first[0]+p.last[0]).toUpperCase(); }
+function avatarColor(id){
+  const palette = ['bg-blue-100 text-blue-700','bg-emerald-100 text-emerald-700','bg-violet-100 text-violet-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-sky-100 text-sky-700','bg-teal-100 text-teal-700','bg-fuchsia-100 text-fuchsia-700'];
+  return palette[id % palette.length];
+}
+
+function openPatientByName(name){
+  const p = PATIENTS.find(p => `${p.first} ${p.last}` === name);
+  if (p) openPatient(p.id);
+}
+let currentPatient = null;
+function openPatient(id) {
+  const p = PATIENTS.find(x => x.id === id);
+  if (!p) return;
+  currentPatient = p;
+  document.getElementById('pdName').textContent = `${p.last}, ${p.first}`;
+  document.getElementById('pdHeaderName').textContent = `${p.first} ${p.last}`;
+  const avatar = document.getElementById('pdAvatar');
+  avatar.className = `w-14 h-14 rounded-full ${avatarColor(p.id)} grid place-items-center text-lg font-semibold`;
+  avatar.textContent = initials(p);
+  document.getElementById('pdStatus').outerHTML = `<span id="pdStatus" class="text-[11px] px-2 py-0.5 rounded-full ${p.status==='active'?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500'} font-medium">${p.status==='active'?'Active':'Inactive'}</span>`;
+  const alertEl = document.getElementById('pdAlert');
+  if (p.alert) { alertEl.textContent = '⚠ ' + p.alert; alertEl.classList.remove('hidden'); } else alertEl.classList.add('hidden');
+  document.getElementById('pdMeta').innerHTML = `MRN <span class="font-mono">${p.mrn}</span> · ${p.sex} · ${p.age}y · DOB ${p.dob}`;
+  document.getElementById('pdBlood').textContent = p.blood;
+  document.getElementById('pdPhone').textContent = p.phone;
+  document.getElementById('pdIns').textContent = p.ins;
+  document.getElementById('pdPcp').textContent = p.pcp;
+
+  // current encounter
+  const enc = ENCOUNTERS_BY_PATIENT[p.id];
+  document.getElementById('currentEnc').innerHTML = enc ? `
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-sm font-medium text-slate-900">${enc.num} · ${enc.type}</div>
+        <div class="text-xs text-slate-500">${enc.date} · ${enc.doctor}</div>
+        <div class="text-sm text-slate-700 mt-2"><span class="text-xs text-slate-500">Chief complaint:</span> ${enc.complaint}</div>
+      </div>
+      ${statusBadge(enc.status)}
+    </div>` : `<div class="text-sm text-slate-500">No active encounter.</div>`;
+
+  // diagnoses
+  document.getElementById('pdDiagnoses').innerHTML = (DIAGNOSES[p.id]||[]).map(d => `
+    <li class="flex items-center justify-between">
+      <span><span class="font-mono text-xs text-slate-500 mr-2">${d.code}</span>${d.text}</span>
+      <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">${d.severity}</span>
+    </li>`).join('') || '<li class="text-sm text-slate-500">None recorded.</li>';
+
+  // allergies
+  document.getElementById('pdAllergies').innerHTML = (ALLERGIES[p.id]||[]).map(a => `<li>⚠️ ${a}</li>`).join('') || '<li class="text-sm text-slate-500">None recorded.</li>';
+
+  // vitals tab
+  const v = VITALS[p.id] || [];
+  document.getElementById('vitalsRows').innerHTML = v.map(r => `
+    <tr class="hover:bg-slate-50">
+      <td class="px-4 py-2 text-sm">${r.type}</td>
+      <td class="px-4 py-2 text-sm font-medium">${r.value}</td>
+      <td class="px-4 py-2 text-sm text-slate-500">${r.unit}</td>
+      <td class="px-4 py-2 text-sm text-slate-500">${r.by}</td>
+      <td class="px-4 py-2 text-sm text-slate-500">Today ${r.at}</td>
+      <td class="px-4 py-2">${statusBadge(r.status)}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No measurements recorded.</td></tr>';
+
+  // chart
+  if (vitalsChartObj) vitalsChartObj.destroy();
+  vitalsChartObj = new Chart(document.getElementById('vitalsChart'), {
+    type:'line',
+    data:{
+      labels:['08:00','10:00','12:00','14:00','16:00'],
+      datasets:[
+        { label:'BP Systolic', data:p.id===4? [158,160,162,162,160] : [118,120,121,120,119], borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,0.08)', tension:0.3, fill:true },
+        { label:'Heart Rate', data:p.id===4? [82,84,86,84,83] : [76,78,80,78,77], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.06)', tension:0.3, fill:true },
+      ]
+    },
+    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, scales:{y:{grid:{color:'#f1f5f9'}}, x:{grid:{display:false}}} }
+  });
+
+  navTo('patient-detail');
+}
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const tab = t.dataset.tab;
+  document.querySelectorAll('[data-tab-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.tabPane !== tab));
+}));
+
+/* -------- vitals modal (Appendix C.1 capture) -------- */
+function openVitalsModal() {
+  if (!currentPatient) { openPatient(1); }
+  document.getElementById('vmPatient').textContent = `${currentPatient.first} ${currentPatient.last} · MRN ${currentPatient.mrn} · Encounter ${ (ENCOUNTERS_BY_PATIENT[currentPatient.id]||{num:'ENC-NEW'}).num }`;
+  document.getElementById('vmRows').innerHTML = '';
+  addVitalRow(); addVitalRow(); addVitalRow();
+  document.getElementById('vitalsModal').classList.remove('hidden');
+  lucide.createIcons();
+}
+function closeVitalsModal() { document.getElementById('vitalsModal').classList.add('hidden'); }
+function addVitalRow() {
+  const row = document.createElement('div');
+  row.className = 'grid grid-cols-12 gap-2 items-center';
+  row.innerHTML = `
+    <select class="vm-type col-span-5 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+      ${MEASUREMENT_TYPES.map(t => `<option value="${t.code}" data-unit="${t.unit}">${t.name}</option>`).join('')}
+    </select>
+    <input class="vm-value col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" placeholder="e.g. 120" />
+    <input class="vm-unit col-span-3 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm" readonly value="${MEASUREMENT_TYPES[0].unit}" />
+    <button type="button" class="col-span-1 p-2 text-slate-400 hover:text-rose-600" onclick="this.parentElement.remove()"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+  `;
+  row.querySelector('.vm-type').addEventListener('change', e => {
+    const opt = e.target.selectedOptions[0];
+    row.querySelector('.vm-unit').value = opt.dataset.unit;
+  });
+  document.getElementById('vmRows').appendChild(row);
+  lucide.createIcons();
+}
+function saveVitals() {
+  const rows = [...document.querySelectorAll('#vmRows > div')];
+  const saved = rows.filter(r => r.querySelector('.vm-value').value !== '').length;
+  closeVitalsModal();
+  toast(`✓ Saved ${saved} measurement${saved===1?'':'s'} · timestamped & audit-logged`);
+  // push into mock data
+  rows.forEach(r => {
+    const v = r.querySelector('.vm-value').value;
+    if (v === '') return;
+    const sel = r.querySelector('.vm-type');
+    const t = MEASUREMENT_TYPES.find(x => x.code === sel.value);
+    const num = parseFloat(v);
+    let status = 'Normal';
+    if (t.low !== null && num < t.low) status = 'Low';
+    else if (t.high !== null && num > t.high) status = 'High';
+    VITALS[currentPatient.id] = VITALS[currentPatient.id] || [];
+    VITALS[currentPatient.id].unshift({ type:t.name, value:num, unit:t.unit, by:'Dr. Julia Smith', at:new Date().toTimeString().slice(0,5), status });
+  });
+  openPatient(currentPatient.id);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 2800);
+}
+
+/* -------- search -------- */
+document.getElementById('globalSearch').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const out = document.getElementById('searchResults');
+  if (!q) { out.classList.add('hidden'); return; }
+  const matches = PATIENTS.filter(p => p.first.toLowerCase().includes(q) || p.last.toLowerCase().includes(q) || p.mrn.toLowerCase().includes(q)).slice(0,6);
+  out.innerHTML = matches.length ? matches.map(p => `
+    <div onclick="openPatient(${p.id}); document.getElementById('globalSearch').value=''; document.getElementById('searchResults').classList.add('hidden');" class="px-4 py-2 hover:bg-slate-50 cursor-pointer flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full ${avatarColor(p.id)} grid place-items-center text-xs font-semibold">${initials(p)}</div>
+      <div class="flex-1">
+        <div class="text-sm font-medium text-slate-900">${p.last}, ${p.first}</div>
+        <div class="text-xs text-slate-500"><span class="font-mono">${p.mrn}</span> · ${p.sex} · ${p.age}y</div>
+      </div>
+    </div>`).join('') : '<div class="px-4 py-3 text-sm text-slate-500">No matches.</div>';
+  out.classList.remove('hidden');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#globalSearch') && !e.target.closest('#searchResults')) {
+    document.getElementById('searchResults').classList.add('hidden');
+  }
+});
+
+/* -------- patient filter -------- */
+document.getElementById('patientFilter').addEventListener('input', e => renderPatients(e.target.value));
+
+/* -------- appointments calendar -------- */
+function renderCalendar() {
+  const hours = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'];
+  const apptMap = {
+    '09:00': { day:2, label:'M. Johnson · Follow-up', cls:'bg-blue-100 text-blue-800' },
+    '10:00': { day:2, label:'A. Patel · Annual',      cls:'bg-emerald-100 text-emerald-800' },
+    '11:00': { day:2, label:'D. Ramirez · BP check',  cls:'bg-amber-100 text-amber-800' },
+    '13:00': { day:2, label:'S. Chen · Anaemia',      cls:'bg-violet-100 text-violet-800' },
+    '14:00': { day:2, label:'L. Walsh · Knee pain',   cls:'bg-rose-100 text-rose-800' },
+    '15:00': { day:2, label:'E. O’Brien · Vacc.',cls:'bg-teal-100 text-teal-800' },
+    '10:00 ': { day:4, label:'Y. Tanaka · CHF mgmt',  cls:'bg-blue-100 text-blue-800' },
+    '14:00 ': { day:5, label:'N. Hassan · Endo',      cls:'bg-emerald-100 text-emerald-800' },
+  };
+  document.getElementById('calendarGrid').innerHTML = hours.map(h => {
+    let cells = `<div class="p-2 text-xs text-slate-400 border-r border-slate-100">${h}</div>`;
+    for (let d = 1; d <= 7; d++) {
+      const m = Object.entries(apptMap).find(([k,v]) => k.trim() === h && v.day === d);
+      cells += `<div class="p-2 border-r border-slate-100 min-h-[44px]">${ m ? `<div class="text-[11px] px-2 py-1 rounded ${m[1].cls} font-medium truncate">${m[1].label}</div>` : '' }</div>`;
+    }
+    return `<div class="grid grid-cols-8 border-b border-slate-100">${cells}</div>`;
+  }).join('');
+}
+
+/* -------- encounters board -------- */
+function renderEncountersBoard() {
+  const inProg = [
+    { num:'ENC-7821', who:'Sarah Chen',     dr:'Dr. Smith',  t:'13:45' },
+    { num:'ENC-7805', who:'Diego Ramirez',  dr:'Dr. Smith',  t:'11:10' },
+    { num:'ENC-7811', who:'Yuki Tanaka',    dr:'Dr. Kim',    t:'12:25' },
+  ];
+  const completed = [
+    { num:'ENC-7790', who:'Marcus Johnson', dr:'Dr. Smith', t:'09:32' },
+    { num:'ENC-7794', who:'Aisha Patel',    dr:'Dr. Kim',   t:'10:48' },
+  ];
+  const scheduled = [
+    { num:'ENC-7830', who:'Liam Walsh',     dr:'Dr. Smith', t:'14:30' },
+    { num:'ENC-7833', who:'Emily O’Brien', dr:'Dr. Lee',   t:'15:00' },
+    { num:'ENC-7841', who:'Nadia Hassan',   dr:'Dr. Lee',   t:'15:45' },
+  ];
+  const card = e => `
+    <div class="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer" onclick="openPatientByName('${e.who}')">
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium text-slate-900">${e.who}</div>
+        <div class="text-[11px] text-slate-500">${e.t}</div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">${e.num} · ${e.dr}</div>
+    </div>`;
+  document.getElementById('encInProgress').innerHTML = inProg.map(card).join('');
+  document.getElementById('encCompleted').innerHTML = completed.map(card).join('');
+  document.getElementById('encScheduled').innerHTML = scheduled.map(card).join('');
+}
+
+/* -------- bootstrap -------- */
+function bootstrap() {
+  renderDashboard();
+  renderPatients();
+}
+lucide.createIcons();
+</script>
+</body>
+</html>
